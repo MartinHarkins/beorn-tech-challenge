@@ -5,11 +5,11 @@
 
     <display-name>Beorn SSR</display-name>
     <servlet>
-        <servlet-name>Hello</servlet-name>
-        <servlet-class>com.beorntech.HelloServlet</servlet-class>
+        <servlet-name>SSRServlet</servlet-name>
+        <servlet-class>com.beorntech.SSRServlet</servlet-class>
     </servlet>
     <servlet-mapping>
-        <servlet-name>Hello</servlet-name>
-        <url-pattern>/hello/*</url-pattern>
+        <servlet-name>SSRServlet</servlet-name>
+        <url-pattern>/*</url-pattern>
     </servlet-mapping>
 </web-app>
