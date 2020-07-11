@@ -1,25 +1,22 @@
 package com.beorntech
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.DisplayName
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
-class HtmlParserTest {
-    @Test
-    @DisplayName("Should find the server/javascript script tags")
-    fun shouldFindTheScriptTags() {
+class HtmlParserTest : StringSpec ({
+    "Should find script tags with our server javascript handle" {
         val script1 = "script1";
         val script2 = "script2";
         val htmlBase = """
                 <script type="server/javascript">$script1</script>
+                <div/>
                 <script type="server/javascript">$script2</script>
             """".trimIndent()
         val res = parseHtml(htmlBase);
-        assertThat(res.size).isEqualTo(2);
-        assertThat(res[0]).isEqualTo(script1);
-        assertThat(res[1]).isEqualTo(script2);
-
-
+        res.size shouldBe 2;
+        res[0] shouldBe script1;
+        res[1] shouldBe script2;
     }
-}
+})
 
