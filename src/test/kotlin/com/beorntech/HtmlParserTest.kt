@@ -56,17 +56,37 @@ class HtmlParserTest : StringSpec({
         parseScript(script, "testScript",
                 hashMapOf(Pair("dummy", dummyInstance)))
         { ctx, scope ->
-            val initialName: NativeJavaObject = scope.get("initialName", scope) as NativeJavaObject;
+            val initialName: NativeJavaObject = scope.get("initialName", scope) as NativeJavaObject
             initialName.unwrap() shouldBe "you"
-            val finalName: NativeJavaObject = scope.get("finalName", scope) as NativeJavaObject;
+            val finalName: NativeJavaObject = scope.get("finalName", scope) as NativeJavaObject
             finalName.unwrap() shouldBe "me"
 
             // Go get the name in the java bean object too.
             val dummyFromJS: NativeJavaObject = scope.get("dummy", scope) as NativeJavaObject
             if (dummyFromJS !== Scriptable.NOT_FOUND) {
-                val theName = dummyFromJS.get("name", dummyFromJS) as NativeJavaObject;
+                val theName = dummyFromJS.get("name", dummyFromJS) as NativeJavaObject
                 theName.unwrap() shouldBe "me"
             }
+        }
+    }
+
+    "should evaluate valid expressions" {
+        shouldEvaluate("\${person.test}") shouldBe true
+        shouldEvaluate("\${someVar}") shouldBe true
+        shouldEvaluate("\${someFunc()}") shouldBe true
+        shouldEvaluate("\${person.someFunc()}") shouldBe true
+        shouldEvaluate("\${person.test}suffix") shouldBe false
+        shouldEvaluate("prefix\${person.test}") shouldBe false
+        shouldEvaluate("\${}") shouldBe false
+
+        // sample of incomplete tests
+//        shouldEvaluate("\${()}") shouldBe false
+//        shouldEvaluate("\${2var}") shouldBe false
+    }
+
+    "should read simple expression" {
+        initializeContext { context, scope ->
+            read(context, scope, "\${5}") shouldBe "5"
         }
     }
 })
