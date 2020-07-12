@@ -1,6 +1,5 @@
 package com.beorntech
 
-import com.sun.org.apache.xml.internal.security.utils.resolver.ResourceResolver
 import java.io.IOException
 import javax.servlet.ServletException
 import javax.servlet.http.HttpServlet
