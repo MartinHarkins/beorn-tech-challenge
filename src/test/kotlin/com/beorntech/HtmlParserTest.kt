@@ -2,8 +2,6 @@ package com.beorntech
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import org.mozilla.javascript.NativeJavaObject
 import org.mozilla.javascript.Scriptable
 
@@ -28,12 +26,13 @@ class HtmlParserTest : StringSpec({
             obj = {a:1, b:['x','y']}
         """.trimIndent()
 
-        parseScript(script, "testScript", null
-        ) { ctx, scope ->
-            val obj: Scriptable = scope.get("obj", scope) as Scriptable
+        val rhinoInterpreter = RhinoJSInterpreter();
+        rhinoInterpreter.eval(script)
 
-            obj.get("a", obj) as Double shouldBe 1
-        }
+        val obj: Scriptable = rhinoInterpreter.getScope().get("obj", rhinoInterpreter.getScope()) as Scriptable
+        obj.get("a", obj) as Double shouldBe 1
+
+        rhinoInterpreter.close();
     }
 
     "should allow for pre-injected java objects in the script scope" {
@@ -55,31 +54,34 @@ class HtmlParserTest : StringSpec({
             var finalName = dummy.name;
         """.trimIndent()
 
-        parseScript(script, "testScript",
-                hashMapOf(Pair("dummy", dummyInstance)))
-        { ctx, scope ->
-            val initialName: NativeJavaObject = scope.get("initialName", scope) as NativeJavaObject
-            initialName.unwrap() shouldBe "you"
-            val finalName: NativeJavaObject = scope.get("finalName", scope) as NativeJavaObject
-            finalName.unwrap() shouldBe "me"
+        val rhinoJSInterpreter = RhinoJSInterpreter(withJavaContext = hashMapOf(Pair("dummy", dummyInstance)))
 
-            // Go get the name in the java bean object too.
-            val dummyFromJS: NativeJavaObject = scope.get("dummy", scope) as NativeJavaObject
-            if (dummyFromJS !== Scriptable.NOT_FOUND) {
-                val theName = dummyFromJS.get("name", dummyFromJS) as NativeJavaObject
-                theName.unwrap() shouldBe "me"
-            }
+        rhinoJSInterpreter.eval(script)
+
+        val scope = rhinoJSInterpreter.getScope()
+
+        val initialName: NativeJavaObject = scope.get("initialName", scope) as NativeJavaObject
+        initialName.unwrap() shouldBe "you"
+        val finalName: NativeJavaObject = scope.get("finalName", scope) as NativeJavaObject
+        finalName.unwrap() shouldBe "me"
+
+        // Go get the name in the java bean object too.
+        val dummyFromJS: NativeJavaObject = scope.get("dummy", scope) as NativeJavaObject
+        if (dummyFromJS !== Scriptable.NOT_FOUND) {
+            val theName = dummyFromJS.get("name", dummyFromJS) as NativeJavaObject
+            theName.unwrap() shouldBe "me"
         }
+        rhinoJSInterpreter.close()
     }
 
     "should evaluate valid expressions" {
-        shouldEvaluate("\${person.test}") shouldBe true
-        shouldEvaluate("\${someVar}") shouldBe true
-        shouldEvaluate("\${someFunc()}") shouldBe true
-        shouldEvaluate("\${person.someFunc()}") shouldBe true
-        shouldEvaluate("\${person.test}suffix") shouldBe false
-        shouldEvaluate("prefix\${person.test}") shouldBe false
-        shouldEvaluate("\${}") shouldBe false
+        isTemplatingExpression("\${person.test}") shouldBe true
+        isTemplatingExpression("\${someVar}") shouldBe true
+        isTemplatingExpression("\${someFunc()}") shouldBe true
+        isTemplatingExpression("\${person.someFunc()}") shouldBe true
+        isTemplatingExpression("\${person.test}suffix") shouldBe false
+        isTemplatingExpression("prefix\${person.test}") shouldBe false
+        isTemplatingExpression("\${}") shouldBe false
 
         // sample of incomplete tests
 //        shouldEvaluate("\${()}") shouldBe false
@@ -87,8 +89,8 @@ class HtmlParserTest : StringSpec({
     }
 
     "should read simple expression" {
-        initializeContext { context, scope ->
-            read(context, scope, "\${5}") shouldBe "5"
+        RhinoJSInterpreter { jsInterpreter ->
+            jsInterpreter.evalAsString(stripTemplating("\${5}")) shouldBe "5"
         }
     }
 
@@ -99,8 +101,9 @@ class HtmlParserTest : StringSpec({
         val res = parseHtml(
                 """<html><head></head><body><div some-attr="$expression1">$expression2</div></body></html>"""
         )
-        onelineHtml(res) shouldBe
-                onelineHtml("""<html><head></head><body><div some-attr="1">2</div></body></html>""")
+        assertHtmlEquals(
+                res,
+                """<html><head></head><body><div some-attr="1">2</div></body></html>""")
     }
 
     "should translate expressions using scopped vars" {
@@ -114,10 +117,11 @@ class HtmlParserTest : StringSpec({
         </script>
         <div>$expression</div>
     </body>
-</html>""".trimIndent())
+</html>""")
 
-        onelineHtml(res) shouldBe
-                onelineHtml("""<html><head></head><body><div>1</div></body></html>""") // dunno why but despite output settings, jsoup ouputs the div on a newline.
+        assertHtmlEquals(
+                res,
+                """<html><head></head><body><div>1</div></body></html>""") // dunno why but despite output settings, jsoup ouputs the div on a newline.
     }
 
     "should translate expressions using injected java models" {
