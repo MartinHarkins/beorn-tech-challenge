@@ -7,19 +7,19 @@ import org.mozilla.javascript.Scriptable
 
 
 class HtmlParserTest : StringSpec({
-    "should find script tags with our server javascript handle" {
-        val script1 = "script1"
-        val script2 = "script2"
-        val htmlBase = """
-                <script type="server/javascript">$script1</script>
-                <div/>
-                <script type="server/javascript">$script2</script>
-            """".trimIndent()
-        val res = parseHtml(htmlBase)
-        res.size shouldBe 2
-        res[0] shouldBe script1
-        res[1] shouldBe script2
-    }
+//    "should find script tags with our server javascript handle" {
+//        val script1 = "script1"
+//        val script2 = "script2"
+//        val htmlBase = """
+//                <script type="server/javascript">$script1</script>
+//                <div/>
+//                <script type="server/javascript">$script2</script>
+//            """".trimIndent()
+//        val res = parseHtml(htmlBase)
+//        res.size shouldBe 2
+//        res[0] shouldBe script1
+//        res[1] shouldBe script2
+//    }
 
     "should do something with a script" {
         val script = """
@@ -88,5 +88,14 @@ class HtmlParserTest : StringSpec({
         initializeContext { context, scope ->
             read(context, scope, "\${5}") shouldBe "5"
         }
+    }
+
+    "should translate expressions within attributes and elements" {
+        val expression1 = "\${1}"
+        val expression2 = "\${2}"
+        parseHtml(
+                """<html><head></head><body><div some-attr="$expression1">$expression2</div></body></html>""".trimIndent()
+        ) shouldBe
+                """<html><head></head><body><div some-attr="1">2</div></body></html>"""
     }
 })

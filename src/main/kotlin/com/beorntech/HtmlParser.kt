@@ -20,17 +20,16 @@ class HtmlParser(htmlContent: String) {
 }
 
 @Throws(IllegalArgumentException::class)
-fun parseHtml(htmlContent: String): List<String> {
-    val doc: Document = Jsoup.parse(htmlContent)
+fun parseHtml(htmlContent: String): String {
+    val doc: Document = Jsoup.parseBodyFragment(htmlContent)
 
     initializeContext { context, scope ->
         parseElement(context, scope, doc);
     }
 
-//    parseElement(doc);
-
-    val scriptsToInterpret = doc.select("script[type=server/javascript]")
-    return scriptsToInterpret.map { e -> e.data() };
+    return doc.outputSettings(
+            Document.OutputSettings().indentAmount(0).prettyPrint(false)
+    ).toString()
 }
 
 fun parseElement(context: Context, parentScope: ScriptableObject, element: Element) {
@@ -41,23 +40,25 @@ fun parseElement(context: Context, parentScope: ScriptableObject, element: Eleme
 //        "script" -> scope = parseScriptTag(element)
         else -> {
             element.attributes().forEach { attr -> parseAttribute(context, scope, attr) }
-            if (shouldEvaluate(element.text())) {
-                read(context, scope, element.text())
-            }
             element.children().forEach { child -> parseElement(context, scope, child) }
+
+            // element.text() will return any text contained within the subtree of element.
+            // we want to handle an element's text at an atomic level and so that element should not have any children.
+            if (element.childrenSize() == 0 && shouldEvaluate(element.text())) {
+                element.text(read(context, scope, element.text()))
+            }
         }
     }
 }
 
 fun parseAttribute(context: Context, parentScope: ScriptableObject, attribute: Attribute) {
     if (shouldEvaluate(attribute.value)) {
-        read(context, parentScope, attribute.value)
+        attribute.setValue(read(context, parentScope, attribute.value))
     }
 }
 
-//val expression = Regex("""^\$\{((\w|\d|\.|\(|\))+)}\$""")
 // handle basic expressions without going too overboard.
-val expression = Regex("^\\$\\{\\w(\\w|\\d|\\.|\\(|\\))*}$")
+val expression = Regex("^\\$\\{(\\w|\\d|\\.| |\\+|\\(|\\))+}$")
 fun shouldEvaluate(string: String): Boolean {
     // TODO: extract the expression
     return expression.matches(string);
@@ -73,7 +74,6 @@ var evalCount = 0;
 fun read(context: Context, scope: ScriptableObject, string: String): String {
     // simple strip of the leading ${ and trailing }
     val expression = string.subSequence(2, string.length - 1).toString();
-    println("expression $expression")
     val evaluatedObj = context.evaluateString(scope, expression, "evalnum" + (evalCount++), 1, null);
 
     if (evaluatedObj is NativeJavaObject) {
