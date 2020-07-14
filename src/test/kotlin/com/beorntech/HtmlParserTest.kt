@@ -2,6 +2,8 @@ package com.beorntech
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import org.mozilla.javascript.NativeJavaObject
 import org.mozilla.javascript.Scriptable
 
@@ -93,9 +95,85 @@ class HtmlParserTest : StringSpec({
     "should translate expressions within attributes and elements" {
         val expression1 = "\${1}"
         val expression2 = "\${2}"
-        parseHtml(
-                """<html><head></head><body><div some-attr="$expression1">$expression2</div></body></html>""".trimIndent()
-        ) shouldBe
-                """<html><head></head><body><div some-attr="1">2</div></body></html>"""
+
+        val res = parseHtml(
+                """<html><head></head><body><div some-attr="$expression1">$expression2</div></body></html>"""
+        )
+        onelineHtml(res) shouldBe
+                onelineHtml("""<html><head></head><body><div some-attr="1">2</div></body></html>""")
+    }
+
+    "should translate expressions using scopped vars" {
+        val expression = "\${a}"
+        val res = parseHtml("""
+<html>
+    <head></head>
+    <body>
+        <script type="server/javascript">
+        var a = 1;
+        </script>
+        <div>$expression</div>
+    </body>
+</html>""".trimIndent())
+
+        onelineHtml(res) shouldBe
+                onelineHtml("""<html><head></head><body><div>1</div></body></html>""") // dunno why but despite output settings, jsoup ouputs the div on a newline.
+    }
+
+    "should translate expressions using injected java models" {
+        class Dummy(name: String) {
+            var name: String = ""
+            fun writeName(name: String) {
+                this.name = name
+            }
+
+            init {
+                writeName(name)
+            }
+        }
+
+        val dummyInstance = Dummy("you")
+
+        val expression = "\${dummy.name}"
+        val res = parseHtml("""
+<html>
+    <head></head>
+    <body>
+        <script type="server/javascript">
+        dummy.writeName("me")
+        </script>
+        <div>$expression</div>
+    </body>
+</html>""", withJavaObjects = hashMapOf(Pair("dummy", dummyInstance)))
+        assertHtmlEquals(res,
+                """
+<html>
+    <head></head>
+    <body>
+        <div>me</div>
+    </body>
+</html>""")
     }
 })
+
+fun assertHtmlEquals(str1: String, str2: String) {
+    onelineHtml(str1) shouldBe onelineHtml(str2)
+}
+
+fun onelineHtml(str: String): String {
+    // todo: this has been a big big pain and it still is a very poor solution.
+    return str.replace("  ", "")
+            .replace("\n", "")
+            .replace(" <", "<")
+            .replace("> ", ">")
+            .replace("\n", "")
+//    Jsoup just doesn't do a good job at cleaning up
+//    The following is not respected in all the cases
+//    val doc = Jsoup.parse(str);
+//    return doc.outputSettings(
+//                    Document.OutputSettings()
+//                            .indentAmount(0)
+//                            .outline(false)
+//                            .prettyPrint(false)
+//            ).toString()
+}

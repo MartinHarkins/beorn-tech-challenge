@@ -21,23 +21,33 @@ class HtmlParser(htmlContent: String) {
 
 @Throws(IllegalArgumentException::class)
 fun parseHtml(htmlContent: String): String {
-    val doc: Document = Jsoup.parseBodyFragment(htmlContent)
+    return parseHtml(htmlContent, null)
+}
+@Throws(IllegalArgumentException::class)
+fun parseHtml(htmlContent: String, withJavaObjects: HashMap<String, Any>?): String {
+    val doc: Document = Jsoup.parse(htmlContent)
+
 
     initializeContext { context, scope ->
+
+        // inject java obj into scope
+        withJavaObjects?.forEach { name, obj ->
+            val wrappedOut = Context.javaToJS(obj, scope);
+            ScriptableObject.putProperty(scope, name, wrappedOut);
+        }
+
         parseElement(context, scope, doc);
     }
 
-    return doc.outputSettings(
-            Document.OutputSettings().indentAmount(0).prettyPrint(false)
-    ).toString()
+    return doc.toString()
 }
 
 fun parseElement(context: Context, parentScope: ScriptableObject, element: Element) {
-    var scope: ScriptableObject = parentScope;
+    val scope: ScriptableObject = parentScope;
     // Could you switch/when pattern
     // Could use adapter pattern
     when (element.tagName()) {
-//        "script" -> scope = parseScriptTag(element)
+        "script" -> parseScriptTag(context, scope, element)
         else -> {
             element.attributes().forEach { attr -> parseAttribute(context, scope, attr) }
             element.children().forEach { child -> parseElement(context, scope, child) }
@@ -78,19 +88,24 @@ fun read(context: Context, scope: ScriptableObject, string: String): String {
 
     if (evaluatedObj is NativeJavaObject) {
         return evaluatedObj.unwrap() as String
+    } else if (evaluatedObj is Double) {
+        return evaluatedObj.toInt().toString()
     }
-    println("could not evaluate expression for $string")
+    println("could not evaluate expression for $string. evaluatedObj was $evaluatedObj")
     return expression;
 }
 
-fun parseScriptTag(element: Element) {
+var scriptCount = 0;
+fun parseScriptTag(context: Context, scope: ScriptableObject, element: Element) {
     if (!"server/javascript".equals(element.attr("type"))) {
         // do nothing
         return;
     }
-    val script = element.data();
 
-    // todo what?
+    context.evaluateString(scope, element.html(), "scriptnum" + (scriptCount++), 1, null);
+
+    // once processed, remove this script tag from the document
+    element.remove();
 }
 
 typealias RunWithScope = (ctx: Context, scope: ScriptableObject) -> Unit;
