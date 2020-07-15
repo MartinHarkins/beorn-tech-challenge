@@ -86,4 +86,16 @@ class RhinoJSInterpreter(withJavaContext: HashMap<String, Any>?, continuence: Sc
     }
 
 
+    override fun evalAsBoolean(expression: String): Boolean {
+        val evaluatedObj = ctx.evaluateString(scope, expression, "expression" + (expressionCount++), 1, null)
+
+        // Todo: handle more types
+        if (evaluatedObj is NativeJavaObject) {
+            return evaluatedObj.unwrap() as Boolean
+        } else if (evaluatedObj is Boolean) {
+            return evaluatedObj
+        }
+        println("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj")
+        return false
+    }
 }

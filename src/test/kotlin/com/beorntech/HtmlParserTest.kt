@@ -86,6 +86,30 @@ class HtmlParserTest : StringSpec({
     </body>
 </html>""")
     }
+
+    "should handle data-if expression to decide on block rendering" {
+        val res = parseHtml("""
+<html>
+    <head></head>
+    <body>
+        <script type="server/javascript">
+        var show = true;
+        var dontshow = false;
+        </script>
+        <div data-if="show">should be returned</div>
+        <div data-if="dontshow">should NOT be returned</div>
+    </body>
+</html>""")
+        assertHtmlEquals(
+                res,
+                """
+<html>
+    <head></head>
+    <body>
+        <div>should be returned</div>
+    </body>
+</html>""")
+    }
 })
 
 fun assertHtmlEquals(str1: String, str2: String) {

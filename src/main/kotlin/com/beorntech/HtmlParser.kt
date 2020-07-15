@@ -22,6 +22,9 @@ fun parseHtml(htmlContent: String, withJavaObjects: HashMap<String, Any>?): Stri
     return doc.toString()
 }
 
+/**
+ *
+ */
 fun walkElement(element: Element, jsInterpreter: JSInterpreter) {
     // Could you switch/when pattern
     // Could use adapter pattern
@@ -38,7 +41,24 @@ fun walkElement(element: Element, jsInterpreter: JSInterpreter) {
             element.remove()
         }
         else -> {
-            element.attributes().forEach { attr -> parseAttribute(attr, jsInterpreter) }
+            element.attributes().forEach { attr ->
+                when {
+                    "data-if" == attr.key -> {
+                        // if the expression evaluates as true, only remove the attribute
+                        // otherwise, remove the element from the dom tree
+                        if (jsInterpreter.evalAsBoolean(attr.value))
+                            element.removeAttr(attr.key)
+                        else
+                            element.remove()
+                    }
+                    attr.key.startsWith("data-for-") -> {
+                        // todo: handle for loops
+                    }
+                    else -> {
+                        parseAttribute(attr, jsInterpreter)
+                    }
+                }
+            }
 
             if (element.childrenSize() > 0) {
                 element.children().forEach { child -> walkElement(child, jsInterpreter) }
