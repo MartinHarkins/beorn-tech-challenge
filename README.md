@@ -25,8 +25,15 @@ Run the jetty server
 ```
 $ ./mvnw jetty:run
 ```
-
 Server will be available at: http://localhost:8080
+
+
+Tests
+
+```
+$ ./mvnw test
+```
+
 
 ## Documentation
 
