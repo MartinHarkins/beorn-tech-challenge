@@ -1,9 +1,6 @@
 package com.beorntech
 
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.NativeArray
-import org.mozilla.javascript.NativeJavaObject
-import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.*
 import java.text.ParseException
 
 typealias Scoped<T> = (i: T) -> Unit
@@ -13,7 +10,7 @@ typealias Scoped<T> = (i: T) -> Unit
  *
  * @param withJavaContext a hash map of java objects and they're corresponding name in the JS
  */
-class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, parent: RhinoJSInterpreter?)
+class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, var parent: RhinoJSInterpreter?)
     :                     JSInterpreter {
     constructor() : this(null, null)
     constructor(parent: RhinoJSInterpreter): this(null, parent)
@@ -52,7 +49,16 @@ class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, parent: RhinoJSInt
 
     private fun configure(ctx: Context) {
         ctx.languageVersion = Context.VERSION_ES6
-        scope = ctx.initStandardObjects()
+
+        // Allow for parent scopes
+        if (parent != null) {
+            val scriptable = ctx.initStandardObjects(parent!!.getScope())
+            if (scriptable is ScriptableObject) {
+                scope = scriptable;
+            }
+        } else {
+            scope = ctx.initStandardObjects()
+        }
     }
 
     override fun close() {

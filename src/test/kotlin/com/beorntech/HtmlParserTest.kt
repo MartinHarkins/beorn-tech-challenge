@@ -135,6 +135,33 @@ class HtmlParserTest : StringSpec({
     </body>
 </html>""")
     }
+
+    "should handle data-for-x expressions and keep scoped vars" {
+        val expression = "\${num}"
+        val expression2 = "\${someVar}"
+        val res = parseHtml("""
+<html>
+    <head></head>
+    <body>
+        <script type="server/javascript">
+        var someVar = 0;
+        var arr = ["1", "2", "3"];
+        </script>
+        <div data-for-num="arr">number: $expression $expression2</div>
+    </body>
+</html>""")
+        assertHtmlEquals(
+                res,
+                """
+<html>
+    <head></head>
+    <body>
+        <div>number: 1 0</div>
+        <div>number: 2 0</div>
+        <div>number: 3 0</div>
+    </body>
+</html>""")
+    }
 })
 
 fun assertHtmlEquals(str1: String, str2: String) {
