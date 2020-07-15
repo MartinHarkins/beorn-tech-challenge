@@ -76,7 +76,7 @@ class HtmlParserTest : StringSpec({
         </script>
         <div>$expression</div>
     </body>
-</html>""", withJavaObjects = hashMapOf(Pair("dummy", dummyInstance)))
+</html>""", Pair("dummy", dummyInstance))
         assertHtmlEquals(res,
                 """
 <html>
@@ -107,6 +107,31 @@ class HtmlParserTest : StringSpec({
     <head></head>
     <body>
         <div>should be returned</div>
+    </body>
+</html>""")
+    }
+
+    "should handle data-for-x expressions" {
+        val expression = "\${num}"
+        val res = parseHtml("""
+<html>
+    <head></head>
+    <body>
+        <script type="server/javascript">
+        var arr = ["1", "2", "3"];
+        </script>
+        <div data-for-num="arr">number: $expression</div>
+    </body>
+</html>""")
+        assertHtmlEquals(
+                res,
+                """
+<html>
+    <head></head>
+    <body>
+        <div>number: 1</div>
+        <div>number: 2</div>
+        <div>number: 3</div>
     </body>
 </html>""")
     }

@@ -45,7 +45,8 @@ class RhinoJSInterpreterTest : StringSpec({
             var finalName = dummy.name;
         """.trimIndent()
 
-        val rhinoJSInterpreter = RhinoJSInterpreter(withJavaContext = hashMapOf(Pair("dummy", dummyInstance)))
+        val rhinoJSInterpreter = RhinoJSInterpreter()
+                .inject(Pair("dummy", dummyInstance)) as RhinoJSInterpreter
 
         rhinoJSInterpreter.eval(script)
 

@@ -11,12 +11,12 @@ fun parseHtml(htmlContent: String): String {
 }
 
 @Throws(IllegalArgumentException::class)
-fun parseHtml(htmlContent: String, withJavaObjects: HashMap<String, Any>?): String {
+fun parseHtml(htmlContent: String, vararg injectables: Pair<String, Any>?): String {
     val doc: Document = Jsoup.parse(htmlContent)
 
 
-    RhinoJSInterpreter(withJavaObjects) { interpreter ->
-        walkElement(doc, interpreter)
+    RhinoJSInterpreter() { interpreter ->
+        walkElement(doc, interpreter.inject(*injectables))
     }
 
     return doc.toString()
@@ -41,7 +41,8 @@ fun walkElement(element: Element, jsInterpreter: JSInterpreter) {
             element.remove()
         }
         else -> {
-            element.attributes().forEach { attr ->
+            val attributes = ArrayList<Attribute>(element.attributes().asList());
+            attributes.forEach { attr ->
                 when {
                     "data-if" == attr.key -> {
                         // if the expression evaluates as true, only remove the attribute
@@ -52,7 +53,23 @@ fun walkElement(element: Element, jsInterpreter: JSInterpreter) {
                             element.remove()
                     }
                     attr.key.startsWith("data-for-") -> {
-                        // todo: handle for loops
+                        val varName = attr.key.subSequence("data-for-".length, attr.key.length)
+                        val arr = jsInterpreter.evalAsArray(attr.value);
+
+                        element.removeAttr(attr.key);
+
+                        arr.forEach { obj ->
+                            val localScopeInterpreter = jsInterpreter
+                                    .createLocalScope()
+                                    .inject(Pair(varName.toString(), obj))
+                            walkElement(
+                                    element.clone().appendTo(element.parent()), localScopeInterpreter)
+                        }
+
+                        // don't forget to remove the initial element. Or should we try to reuse it?
+                        // not a very big perf gain in any case.
+                        element.remove()
+                        return;
                     }
                     else -> {
                         parseAttribute(attr, jsInterpreter)
@@ -61,15 +78,20 @@ fun walkElement(element: Element, jsInterpreter: JSInterpreter) {
             }
 
             if (element.childrenSize() > 0) {
-                element.children().forEach { child -> walkElement(child, jsInterpreter) }
+                val children = ArrayList<Element>(element.children())
+                children.forEach { child -> walkElement(child, jsInterpreter) }
             } else {
-                // we want to handle an element's text at an atomic level and so that element should not have any children.
                 // element.text() will return any text contained within the subtree of element.
-                val text = element.text().trim();
-                if (isTemplatingExpression(text)) {
-                    element.text(
-                            jsInterpreter.evalAsString(stripTemplating(text)))
+                // that means we should already have filtered down to elements not containing child elements.
+
+                val text = element.text().replace(allTemplatingExpressions) { matchResult ->
+                    val matchGroup = matchResult.groups[1]
+                    if (matchGroup != null) {
+                        jsInterpreter.evalAsString(matchGroup.value)
+                    } else
+                        ""
                 }
+                element.text(text)
             }
         }
     }
@@ -87,6 +109,7 @@ fun isTemplatingExpression(string: String): Boolean {
     // TODO: extract the expression
     return expression.matches(string)
 }
+val allTemplatingExpressions = Regex("\\$\\{([^}]+)}")
 
 /**
  * remove ${ and } from around the expression

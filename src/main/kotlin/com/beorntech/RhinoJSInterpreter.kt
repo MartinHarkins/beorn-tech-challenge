@@ -1,8 +1,10 @@
 package com.beorntech
 
 import org.mozilla.javascript.Context
+import org.mozilla.javascript.NativeArray
 import org.mozilla.javascript.NativeJavaObject
 import org.mozilla.javascript.ScriptableObject
+import java.text.ParseException
 
 typealias Scoped<T> = (i: T) -> Unit
 
@@ -11,11 +13,11 @@ typealias Scoped<T> = (i: T) -> Unit
  *
  * @param withJavaContext a hash map of java objects and they're corresponding name in the JS
  */
-class RhinoJSInterpreter(withJavaContext: HashMap<String, Any>?, continuence: Scoped<JSInterpreter>?)
+class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, parent: RhinoJSInterpreter?)
     :                     JSInterpreter {
-    constructor(continuence: Scoped<JSInterpreter>) : this(null, continuence)
-    constructor(withJavaContext: HashMap<String, Any>) : this(withJavaContext, null)
     constructor() : this(null, null)
+    constructor(parent: RhinoJSInterpreter): this(null, parent)
+    constructor(continuence: Scoped<JSInterpreter>) : this(continuence, null)
 
     var scriptCount = 0
     var expressionCount = 0
@@ -30,13 +32,13 @@ class RhinoJSInterpreter(withJavaContext: HashMap<String, Any>?, continuence: Sc
         // Optionally use a continuance pattern in which case we close the context for the consumer.
         if (continuence != null) {
             try {
-                configure(ctx, withJavaContext)
+                configure(ctx)
                 continuence.invoke(this);
             } finally {
                 Context.exit()
             }
         } else {
-            configure(ctx, withJavaContext)
+            configure(ctx)
         }
     }
 
@@ -48,24 +50,17 @@ class RhinoJSInterpreter(withJavaContext: HashMap<String, Any>?, continuence: Sc
         return ctx;
     }
 
-    private fun configure(ctx: Context, withJavaContext: HashMap<String, Any>?) {
+    private fun configure(ctx: Context) {
         ctx.languageVersion = Context.VERSION_ES6
         scope = ctx.initStandardObjects()
-
-        // inject java obj into scope
-        withJavaContext?.forEach { name, obj ->
-            val wrappedOut = Context.javaToJS(obj, scope)
-            ScriptableObject.putProperty(scope, name, wrappedOut)
-        }
     }
 
     override fun close() {
         Context.exit()
     }
 
-    override fun createLocalScope(scriptContents: String): JSInterpreter {
-        TODO("Not yet implemented")
-        // TODO: clone this with a new scope.
+    override fun createLocalScope(): JSInterpreter {
+        return RhinoJSInterpreter(this)
     }
 
     override fun eval(scriptContents: String) {
@@ -76,13 +71,21 @@ class RhinoJSInterpreter(withJavaContext: HashMap<String, Any>?, continuence: Sc
         val evaluatedObj = ctx.evaluateString(scope, expression, "expression" + (expressionCount++), 1, null)
 
         // Todo: handle more types
-        if (evaluatedObj is NativeJavaObject) {
-            return evaluatedObj.unwrap() as String
-        } else if (evaluatedObj is Double) {
-            return evaluatedObj.toInt().toString()
+        when (evaluatedObj) {
+            is String -> {
+                return evaluatedObj
+            }
+            is NativeJavaObject -> {
+                return evaluatedObj.unwrap() as String
+            }
+            is Double -> {
+                return evaluatedObj.toInt().toString()
+            }
+            else -> {
+                println("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj")
+                return expression
+            }
         }
-        println("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj")
-        return expression
     }
 
 
@@ -97,5 +100,27 @@ class RhinoJSInterpreter(withJavaContext: HashMap<String, Any>?, continuence: Sc
         }
         println("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj")
         return false
+    }
+
+    @Throws(ParseException::class)
+    override fun evalAsArray(expression: String): Array<Any> {
+        val evaluatedObj = ctx.evaluateString(scope, expression, "expression" + (expressionCount++), 1, null)
+        if (evaluatedObj is NativeArray) {
+            return evaluatedObj.toArray();
+        }
+        println("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj")
+
+        // hacky and basic exception throwing but this is better than swallowing the errors
+        throw ParseException("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj", 0)
+    }
+
+    override fun inject(vararg pairs: Pair<String, Any>?): JSInterpreter {
+        pairs.forEach { pair ->
+            if (pair != null) {
+                val wrappedOut = Context.javaToJS(pair.second, scope)
+                ScriptableObject.putProperty(scope, pair.first, wrappedOut)
+            }
+        }
+        return this
     }
 }
