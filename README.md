@@ -44,6 +44,8 @@ This application is composed of three elements:
 
 The Html Parser shouldn't be aware of the implementation details of the JS Interpreter.
 
+Sorely lacking error handling.
+
 ### Servlet
 A simple servlet, currently only statically serves useless html code
 

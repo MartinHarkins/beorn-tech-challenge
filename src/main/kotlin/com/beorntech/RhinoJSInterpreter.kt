@@ -45,9 +45,13 @@ class RhinoJSInterpreter(private val parent: RhinoJSInterpreter?, continuance: S
      */
     private fun configure(ctx: Context) {
         ctx.languageVersion = Context.VERSION_ES6
-
+        // allow usage of importClass()
+        val topLevelImporter: ScriptableObject = ImporterTopLevel(ctx);
         if (parent == null) {
-            scope = ctx.initStandardObjects()
+            val scriptable = ctx.initStandardObjects(topLevelImporter)
+            if (scriptable is ScriptableObject) {
+                scope = scriptable;
+            }
         }
         else {
             val scriptable = ctx.initStandardObjects(parent.scope)
@@ -109,6 +113,11 @@ class RhinoJSInterpreter(private val parent: RhinoJSInterpreter?, continuance: S
         val evaluatedObj = ctx.evaluateString(scope, expression, "expression" + (expressionCount++), 1, null)
         if (evaluatedObj is NativeArray) {
             return evaluatedObj.toArray();
+        } else if (evaluatedObj is NativeJavaObject) {
+            val unwrapped = evaluatedObj.unwrap()
+            if (unwrapped is ArrayList<*>) {
+                return unwrapped.toArray()
+            }
         }
         println("could not evaluate expression for $expression. evaluatedObj was $evaluatedObj")
 

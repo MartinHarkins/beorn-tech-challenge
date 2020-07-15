@@ -55,7 +55,8 @@ private fun parseElement(jsInterpreter: JSInterpreter, element: Element) {
     }
 
     val attributes = Collections.unmodifiableList(element.attributes().asList())
-    attributes.forEach { attr -> parseAttribute(jsInterpreter, element, attr) }
+    // hacky way to up and quit if the processing of an attribute should stop.
+    if (attributes.any { attr -> parseAttribute(jsInterpreter, element, attr) }) return
 
     // element.text() will return any text contained within the subtree of element.
     // that means we should already have filtered down to elements not containing child elements.
@@ -79,7 +80,12 @@ private fun evaluateMatch(jsInterpreter: JSInterpreter): (MatchResult) -> CharSe
     }
 }
 
-private fun parseAttribute(jsInterpreter: JSInterpreter, element: Element, attr: Attribute) {
+/**
+ * Parses an Attribute of an Element
+ *
+ * @returns true if the element was removed from the DOM tree (pretty bad impl I know)
+ */
+private fun parseAttribute(jsInterpreter: JSInterpreter, element: Element, attr: Attribute): Boolean {
     when {
         "data-if" == attr.key -> {
             // if the expression evaluates as true, only remove the attribute
@@ -106,7 +112,7 @@ private fun parseAttribute(jsInterpreter: JSInterpreter, element: Element, attr:
             // don't forget to remove the initial element. Or should we try to reuse it?
             // not a very big perf gain in any case.
             element.remove()
-            return
+            return true
         }
         else -> {
             if (isTemplatingExpression(attr.value)) {
@@ -114,6 +120,7 @@ private fun parseAttribute(jsInterpreter: JSInterpreter, element: Element, attr:
             }
         }
     }
+    return false
 }
 
 fun isTemplatingExpression(string: String): Boolean {
