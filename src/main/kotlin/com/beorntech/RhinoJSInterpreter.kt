@@ -10,27 +10,28 @@ typealias Scoped<T> = (i: T) -> Unit
  *
  * @param withJavaContext a hash map of java objects and they're corresponding name in the JS
  */
-class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, var parent: RhinoJSInterpreter?)
+class RhinoJSInterpreter(private val parent: RhinoJSInterpreter?, continuance: Scoped<JSInterpreter>?)
     :                     JSInterpreter {
     constructor() : this(null, null)
-    constructor(parent: RhinoJSInterpreter): this(null, parent)
-    constructor(continuence: Scoped<JSInterpreter>) : this(continuence, null)
+    constructor(parent: RhinoJSInterpreter): this(parent, null)
+    constructor(continuance: Scoped<JSInterpreter>) : this(null, continuance)
 
-    var scriptCount = 0
-    var expressionCount = 0
+    private var scriptCount = 0 // used for source tagging
+    private var expressionCount = 0 // used for source tagging
 
-    private var ctx: Context;
-    private lateinit var scope: ScriptableObject;
+    private var ctx: Context
 
-    // TODO: use a builder pattern to return the RhinoJSInterpreter
+    lateinit var scope: ScriptableObject
+        private set
+
     init {
         ctx = Context.enter()
 
         // Optionally use a continuance pattern in which case we close the context for the consumer.
-        if (continuence != null) {
+        if (continuance != null) {
             try {
                 configure(ctx)
-                continuence.invoke(this);
+                continuance.invoke(this);
             } finally {
                 Context.exit()
             }
@@ -39,25 +40,20 @@ class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, var parent: RhinoJ
         }
     }
 
-    fun getScope(): ScriptableObject {
-        return scope;
-    }
-
-    fun getContext(): Context {
-        return ctx;
-    }
-
+    /**
+     * Configure the current context and build the scope.
+     */
     private fun configure(ctx: Context) {
         ctx.languageVersion = Context.VERSION_ES6
 
-        // Allow for parent scopes
-        if (parent != null) {
-            val scriptable = ctx.initStandardObjects(parent!!.getScope())
+        if (parent == null) {
+            scope = ctx.initStandardObjects()
+        }
+        else {
+            val scriptable = ctx.initStandardObjects(parent.scope)
             if (scriptable is ScriptableObject) {
                 scope = scriptable;
             }
-        } else {
-            scope = ctx.initStandardObjects()
         }
     }
 
@@ -65,7 +61,7 @@ class RhinoJSInterpreter(continuence: Scoped<JSInterpreter>?, var parent: RhinoJ
         Context.exit()
     }
 
-    override fun createLocalScope(): JSInterpreter {
+    override fun createChild(): JSInterpreter {
         return RhinoJSInterpreter(this)
     }
 

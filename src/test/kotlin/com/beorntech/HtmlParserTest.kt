@@ -2,8 +2,6 @@ package com.beorntech
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import org.mozilla.javascript.NativeJavaObject
-import org.mozilla.javascript.Scriptable
 
 
 class HtmlParserTest : StringSpec({
@@ -27,6 +25,7 @@ class HtmlParserTest : StringSpec({
         val expression2 = "\${2}"
 
         val res = parseHtml(
+                RhinoJSInterpreter(),
                 """<html><head></head><body><div some-attr="$expression1">$expression2</div></body></html>"""
         )
         assertHtmlEquals(
@@ -36,7 +35,8 @@ class HtmlParserTest : StringSpec({
 
     "should translate expressions using scopped vars" {
         val expression = "\${a}"
-        val res = parseHtml("""
+        val res = parseHtml(RhinoJSInterpreter(),
+                """
 <html>
     <head></head>
     <body>
@@ -67,7 +67,10 @@ class HtmlParserTest : StringSpec({
         val dummyInstance = Dummy("you")
 
         val expression = "\${dummy.name}"
-        val res = parseHtml("""
+
+        val res = parseHtml(
+                RhinoJSInterpreter().inject(Pair("dummy", dummyInstance)),
+                """
 <html>
     <head></head>
     <body>
@@ -76,7 +79,7 @@ class HtmlParserTest : StringSpec({
         </script>
         <div>$expression</div>
     </body>
-</html>""", Pair("dummy", dummyInstance))
+</html>""")
         assertHtmlEquals(res,
                 """
 <html>
@@ -88,7 +91,8 @@ class HtmlParserTest : StringSpec({
     }
 
     "should handle data-if expression to decide on block rendering" {
-        val res = parseHtml("""
+        val res = parseHtml(RhinoJSInterpreter(),
+                """
 <html>
     <head></head>
     <body>
@@ -113,7 +117,9 @@ class HtmlParserTest : StringSpec({
 
     "should handle data-for-x expressions" {
         val expression = "\${num}"
-        val res = parseHtml("""
+        val res =
+                parseHtml(RhinoJSInterpreter(),
+                        """
 <html>
     <head></head>
     <body>
@@ -139,7 +145,8 @@ class HtmlParserTest : StringSpec({
     "should handle data-for-x expressions and keep scoped vars" {
         val expression = "\${num}"
         val expression2 = "\${someVar}"
-        val res = parseHtml("""
+        val res = parseHtml(RhinoJSInterpreter(),
+                """
 <html>
     <head></head>
     <body>
@@ -164,8 +171,8 @@ class HtmlParserTest : StringSpec({
     }
 })
 
-fun assertHtmlEquals(str1: String, str2: String) {
-    onelineHtml(str1) shouldBe onelineHtml(str2)
+fun assertHtmlEquals(value: String, expecting: String) {
+    onelineHtml(value) shouldBe onelineHtml(expecting)
 }
 
 fun onelineHtml(str: String): String {

@@ -20,7 +20,7 @@ class RhinoJSInterpreterTest : StringSpec({
         val rhinoInterpreter = RhinoJSInterpreter();
         rhinoInterpreter.eval(script)
 
-        val obj: Scriptable = rhinoInterpreter.getScope().get("obj", rhinoInterpreter.getScope()) as Scriptable
+        val obj: Scriptable = rhinoInterpreter.scope.get("obj", rhinoInterpreter.scope) as Scriptable
         obj.get("a", obj) as Double shouldBe 1
 
         rhinoInterpreter.close();
@@ -50,10 +50,11 @@ class RhinoJSInterpreterTest : StringSpec({
 
         rhinoJSInterpreter.eval(script)
 
-        val scope = rhinoJSInterpreter.getScope()
+        val scope = rhinoJSInterpreter.scope
 
         val initialName: NativeJavaObject = scope.get("initialName", scope) as NativeJavaObject
         initialName.unwrap() shouldBe "you"
+        rhinoJSInterpreter.evalAsString("initialName") shouldBe "you"
         val finalName: NativeJavaObject = scope.get("finalName", scope) as NativeJavaObject
         finalName.unwrap() shouldBe "me"
 
